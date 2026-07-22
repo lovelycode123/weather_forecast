@@ -2,7 +2,7 @@
 
 Backend GraphQL service that ranks the next 7 days for **skiing**, **surfing**, **outdoor sightseeing**, and **indoor sightseeing** for a given city/town, using [Open-Meteo](https://open-meteo.com/) weather data.
 
-> Status: scaffold + schema + Open-Meteo + SQLite TTL cache + activity scoring. GraphQL resolvers still TODO.
+> Status: end-to-end GraphQL API — Open-Meteo + SQLite TTL cache + scoring + rankings.
 
 ## Stack
 
@@ -19,9 +19,26 @@ npm install
 npm run dev
 ```
 
-GraphQL endpoint: `http://localhost:4000/`
+GraphQL endpoint: `http://localhost:4000/` (Apollo Sandbox in the browser).
 
-`activityForecast` currently throws `Not implemented` — schema is loadable in Apollo Sandbox for inspection.
+Example query:
+
+```graphql
+query {
+  activityForecast(location: "Biarritz") {
+    location { name country }
+    refreshedAt
+    fromCache
+    rankings {
+      activity
+      rank
+      averageScore
+      bestDay
+      worstDay
+    }
+  }
+}
+```
 
 ```bash
 npm run typecheck

@@ -1,4 +1,5 @@
 export { scoreDay, scoreDays } from "./score.js";
+export { buildRankings, type ActivityWeekSummary } from "./rankings.js";
 export {
   scoreSkiing,
   scoreSurfing,

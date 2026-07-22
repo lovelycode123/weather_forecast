@@ -3,6 +3,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ApolloServer } from "@apollo/server";
 import { startStandaloneServer } from "@apollo/server/standalone";
+import { createForecastService } from "./forecast/index.js";
+import { createResolvers } from "./resolvers.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -17,16 +19,9 @@ function loadTypeDefs(): string {
   throw new Error("Could not find schema.graphql");
 }
 
+const forecastService = createForecastService();
 const typeDefs = loadTypeDefs();
-
-// Resolvers intentionally empty for this step — schema only.
-const resolvers = {
-  Query: {
-    activityForecast: () => {
-      throw new Error("Not implemented — resolvers come next");
-    },
-  },
-};
+const resolvers = createResolvers(forecastService);
 
 const server = new ApolloServer({
   typeDefs,
@@ -40,3 +35,4 @@ const { url } = await startStandaloneServer(server, {
 });
 
 console.log(`Weather activity API ready at ${url}`);
+console.log(`Cache TTL: ${forecastService.ttlMs}ms — DB: ${process.env.DB_PATH ?? "data/weather.db"}`);

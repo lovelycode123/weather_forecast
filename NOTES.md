@@ -28,7 +28,6 @@ Unpolished decision log for the take-home. Newest at the bottom.
 
 ### Cut / deferred
 
-- GraphQL resolvers + week rankings on top of `ForecastService` + `scoreDays` — next.
 - Auth, rate limiting, multi-match location picker — out of scope unless time left.
 - Unit conversion args (°C vs °F) — stay metric to match Open-Meteo defaults.
 
@@ -101,10 +100,6 @@ Still not wiring cache into GraphQL/Open-Meteo fetch path — next step after sc
 
 `location_queries(query_normalized PK, location_id, resolved_at)` — needed so a cache hit doesn't still pay for geocoding.
 
-### Not done
-
-GraphQL resolver still stubbed; scoring next. Service is ready to plug in.
-
 ---
 
 ## 2026-07-22 — Rule-based activity scoring
@@ -121,3 +116,13 @@ Pure functions in `src/scoring/`. Each day → four `ActivityDayScore`s (0–100
 Suitability: 0–24 POOR, 25–49 FAIR, 50–74 GOOD, 75–100 EXCELLENT.
 
 Deliberately heuristic and readable — no ML, no hidden weights file. Week-level ranking still TODO in the GraphQL/assembly step.
+
+---
+
+## 2026-07-22 — GraphQL resolvers
+
+`activityForecast(location)` → `ForecastService` → `scoreDays` → `buildRankings`.
+
+- Per activity: average over 7 days, `bestDay` / `worstDay` by daily score.
+- `rankings` sorted by `averageScore` desc (ties keep schema activity order); `rank` 1 = best.
+- `refreshedAt` maps from store `fetchedAt`; unknown place → GraphQL `NOT_FOUND`.
