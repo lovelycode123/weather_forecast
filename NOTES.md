@@ -28,7 +28,7 @@ Unpolished decision log for the take-home. Newest at the bottom.
 
 ### Cut / deferred
 
-- Resolvers, scoring functions, cache-aware fetch orchestration — next.
+- Resolvers + scoring on top of `ForecastService` — next.
 - Auth, rate limiting, multi-match location picker — out of scope unless time left.
 - Unit conversion args (°C vs °F) — stay metric to match Open-Meteo defaults.
 
@@ -83,3 +83,24 @@ So: if every height is null (or the marine call fails), set `marineAvailable: fa
 ### Deferred
 
 Still not wiring cache into GraphQL/Open-Meteo fetch path — next step after scoring or as part of the service layer.
+
+---
+
+## 2026-07-22 — Cache-aware forecast service
+
+### Behaviour
+
+`src/forecast/service.ts` — TTL default **6h** (`FORECAST_TTL_MS` to override).
+
+1. Look up normalized query (`trim` + lower + collapse spaces) in `location_queries`.
+2. If place known and `getFreshForecast` (age ≤ TTL, ≥7 days) → return SQLite, `fromCache: true`. **No Open-Meteo calls.**
+3. If place known but stale → refresh weather/marine with stored coords (skip geocode), persist, `fromCache: false`.
+4. If query unknown → geocode once, remember query→location, then same fresh-check / refresh. Covers alias queries hitting an already-cached place ("Paris" then a second spelling that maps to same coords after geocode).
+
+### Schema add
+
+`location_queries(query_normalized PK, location_id, resolved_at)` — needed so a cache hit doesn't still pay for geocoding.
+
+### Not done
+
+GraphQL resolver still stubbed; scoring next. Service is ready to plug in.

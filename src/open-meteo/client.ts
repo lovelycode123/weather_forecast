@@ -180,9 +180,8 @@ export class OpenMeteoClient {
     }
   }
 
-  /** Geocode → weather + optional marine merge. */
-  async getForecastForLocation(cityOrTown: string): Promise<LocationForecast> {
-    const location = await this.geocode(cityOrTown);
+  /** Weather + optional marine merge for an already-resolved place (skips geocoding). */
+  async fetchForecast(location: ResolvedLocation): Promise<LocationForecast> {
     const [days, wavesByDate] = await Promise.all([
       this.fetchDailyForecast(location),
       this.fetchWaveHeightsByDate(location),
@@ -198,6 +197,12 @@ export class OpenMeteoClient {
     }));
 
     return { location, days: merged, marineAvailable: true };
+  }
+
+  /** Geocode → weather + optional marine merge. */
+  async getForecastForLocation(cityOrTown: string): Promise<LocationForecast> {
+    const location = await this.geocode(cityOrTown);
+    return this.fetchForecast(location);
   }
 }
 

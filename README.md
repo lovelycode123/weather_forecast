@@ -2,7 +2,7 @@
 
 Backend GraphQL service that ranks the next 7 days for **skiing**, **surfing**, **outdoor sightseeing**, and **indoor sightseeing** for a given city/town, using [Open-Meteo](https://open-meteo.com/) weather data.
 
-> Status: scaffold + schema + Open-Meteo client + SQLite store. Scoring, cache orchestration, and resolvers still TODO.
+> Status: scaffold + schema + Open-Meteo client + SQLite + TTL cache service. Scoring and GraphQL resolvers still TODO.
 
 ## Stack
 
@@ -10,6 +10,7 @@ Backend GraphQL service that ranks the next 7 days for **skiing**, **surfing**, 
 - Apollo Server 5 + GraphQL SDL
 - Open-Meteo (geocoding + forecast + marine)
 - SQLite via `better-sqlite3` (`data/weather.db`, override with `DB_PATH`)
+- Forecast cache TTL: 6 hours (`FORECAST_TTL_MS` to override)
 
 ## Run
 
@@ -63,12 +64,24 @@ const saved = store.saveLocationForecast(location, days);
 const cached = store.getFreshForecast(saved.location.id, 6 * 60 * 60 * 1000);
 ```
 
+## Cache-aware service
+
+[`src/forecast/`](src/forecast/) — uses SQLite when `fetched_at` is within TTL; otherwise refreshes from Open-Meteo.
+
+```ts
+import { createForecastService } from "./forecast/index.js";
+
+const service = createForecastService();
+const first = await service.getForecast("Paris");  // fromCache: false
+const second = await service.getForecast("Paris"); // fromCache: true (within 6h)
+```
+
 ## Assumptions (so far)
 
 See [`NOTES.md`](NOTES.md) for the running decision log. Short version:
 
 1. **Location** — free-text city/town; resolve via Open-Meteo Geocoding; take the top match (no disambiguation UI — this is backend-only).
 2. **Rank** — score each day 0–100 per activity; rank activities by average score over the week.
-3. **Persistence** — SQLite: locations unique on rounded lat/lon (2 dp); daily rows keyed by location + date with shared `fetched_at` per refresh. TTL (~6h) via `getFreshForecast` when the service layer is wired.
+3. **Persistence** — SQLite cache with 6h TTL. Query→location map so cache hits skip geocoding too. Stale data refreshes weather/marine using stored coords.
 4. **Marine data** — surfing may need Open-Meteo marine API; inland locations get a low surfing score with an explicit reason when waves are unavailable.
 5. **No frontend** — GraphQL only, as specified.

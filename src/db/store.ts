@@ -80,7 +80,18 @@ CREATE TABLE IF NOT EXISTS daily_forecasts (
 
 CREATE INDEX IF NOT EXISTS idx_daily_forecasts_location_fetched
   ON daily_forecasts (location_id, fetched_at);
+
+CREATE TABLE IF NOT EXISTS location_queries (
+  query_normalized TEXT PRIMARY KEY,
+  location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+  resolved_at TEXT NOT NULL
+);
 `;
+
+/** Normalize a city/town search string for cache lookup. */
+export function normalizeQuery(query: string): string {
+  return query.trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 function rowToLocation(row: LocationRow): StoredLocation {
   return {
@@ -182,6 +193,39 @@ export class ForecastStore {
       .get(id) as LocationRow | undefined;
 
     return row ? rowToLocation(row) : null;
+  }
+
+  /** Look up a previously resolved search string (trimmed, lowercased). */
+  findLocationByQuery(query: string): StoredLocation | null {
+    const normalized = normalizeQuery(query);
+    if (!normalized) return null;
+
+    const row = this.db
+      .prepare(
+        `SELECT l.id, l.name, l.country, l.admin1, l.latitude, l.longitude, l.timezone
+         FROM location_queries q
+         JOIN locations l ON l.id = q.location_id
+         WHERE q.query_normalized = ?`,
+      )
+      .get(normalized) as LocationRow | undefined;
+
+    return row ? rowToLocation(row) : null;
+  }
+
+  /** Remember that this search string resolved to a location (for cache hits without geocoding). */
+  rememberQuery(query: string, locationId: number, resolvedAt = new Date().toISOString()): void {
+    const normalized = normalizeQuery(query);
+    if (!normalized) return;
+
+    this.db
+      .prepare(
+        `INSERT INTO location_queries (query_normalized, location_id, resolved_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT (query_normalized) DO UPDATE SET
+           location_id = excluded.location_id,
+           resolved_at = excluded.resolved_at`,
+      )
+      .run(normalized, locationId, resolvedAt);
   }
 
   /**
@@ -293,11 +337,17 @@ export class ForecastStore {
 
   /**
    * Return cached forecast only if `fetched_at` is within `maxAgeMs`.
-   * TTL wiring for the GraphQL layer lives here later (~6h).
+   * Optionally require a minimum number of daily rows (default 7).
    */
-  getFreshForecast(locationId: number, maxAgeMs: number, now = Date.now()): StoredForecast | null {
+  getFreshForecast(
+    locationId: number,
+    maxAgeMs: number,
+    now = Date.now(),
+    minDays = 7,
+  ): StoredForecast | null {
     const forecast = this.getForecast(locationId);
     if (!forecast) return null;
+    if (forecast.days.length < minDays) return null;
 
     const age = now - Date.parse(forecast.fetchedAt);
     if (!Number.isFinite(age) || age < 0 || age > maxAgeMs) {

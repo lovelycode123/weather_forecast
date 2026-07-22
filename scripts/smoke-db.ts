@@ -51,11 +51,12 @@ const store = new ForecastStore(dbPath);
 try {
   const saved = store.saveLocationForecast(location, days, fetchedAt);
   const loaded = store.getForecast(saved.location.id);
-  const fresh = store.getFreshForecast(saved.location.id, 6 * 60 * 60 * 1000, Date.parse(fetchedAt) + 1000);
+  const fresh = store.getFreshForecast(saved.location.id, 6 * 60 * 60 * 1000, Date.parse(fetchedAt) + 1000, 2);
   const stale = store.getFreshForecast(
     saved.location.id,
     6 * 60 * 60 * 1000,
     Date.parse(fetchedAt) + 7 * 60 * 60 * 1000,
+    2,
   );
 
   // Same place, slightly different coords → same lat_key/lon_key
