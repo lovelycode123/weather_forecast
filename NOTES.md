@@ -115,7 +115,7 @@ Pure functions in `src/scoring/`. Each day → four `ActivityDayScore`s (0–100
 
 Suitability: 0–24 POOR, 25–49 FAIR, 50–74 GOOD, 75–100 EXCELLENT.
 
-Deliberately heuristic and readable — no ML, no hidden weights file. Week-level ranking still TODO in the GraphQL/assembly step.
+Deliberately heuristic and readable — no ML, no hidden weights file.
 
 ---
 
@@ -126,3 +126,9 @@ Deliberately heuristic and readable — no ML, no hidden weights file. Week-leve
 - Per activity: average over 7 days, `bestDay` / `worstDay` by daily score.
 - `rankings` sorted by `averageScore` desc (ties keep schema activity order); `rank` 1 = best.
 - `refreshedAt` maps from store `fetchedAt`; unknown place → GraphQL `NOT_FOUND`.
+
+---
+
+## 2026-07-22 — README + trade-offs doc
+
+Rewrote README for “what / run / assumptions.” Extracted durable decision rationale into `TRADEOFFS.md` so `NOTES.md` can stay as the messy working log.

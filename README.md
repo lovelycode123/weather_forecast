@@ -1,16 +1,24 @@
-# Weather activity forecast (take-home)
+# Weather activity forecast
 
-Backend GraphQL service that ranks the next 7 days for **skiing**, **surfing**, **outdoor sightseeing**, and **indoor sightseeing** for a given city/town, using [Open-Meteo](https://open-meteo.com/) weather data.
+Backend GraphQL service that takes a city or town and ranks how good the next **7 days** look for:
 
-> Status: end-to-end GraphQL API — Open-Meteo + SQLite TTL cache + scoring + rankings.
+- Skiing
+- Surfing
+- Outdoor sightseeing
+- Indoor sightseeing
+
+Weather comes from [Open-Meteo](https://open-meteo.com/) (geocoding + forecast + marine). Forecasts are cached in SQLite so we do not call Open-Meteo on every request.
+
+No frontend — GraphQL only, as specified.
 
 ## Stack
 
-- Node.js 20+ / TypeScript
-- Apollo Server 5 + GraphQL SDL
-- Open-Meteo (geocoding + forecast + marine)
-- SQLite via `better-sqlite3` (`data/weather.db`, override with `DB_PATH`)
-- Forecast cache TTL: 6 hours (`FORECAST_TTL_MS` to override)
+| Piece | Choice |
+|---|---|
+| Runtime | Node.js 20+ / TypeScript |
+| API | Apollo Server 5 + GraphQL SDL |
+| Weather | Open-Meteo |
+| Storage | SQLite (`better-sqlite3`) |
 
 ## Run
 
@@ -19,14 +27,28 @@ npm install
 npm run dev
 ```
 
-GraphQL endpoint: `http://localhost:4000/` (Apollo Sandbox in the browser).
+Open [http://localhost:4000/](http://localhost:4000/) for Apollo Sandbox.
 
-Example query:
+```bash
+npm run typecheck
+npm run build
+npm start
+```
+
+### Environment
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PORT` | `4000` | HTTP port |
+| `DB_PATH` | `data/weather.db` | SQLite file |
+| `FORECAST_TTL_MS` | `21600000` (6h) | Max age before refreshing from Open-Meteo |
+
+### Example query
 
 ```graphql
 query {
   activityForecast(location: "Biarritz") {
-    location { name country }
+    location { name country latitude longitude timezone }
     refreshedAt
     fromCache
     rankings {
@@ -35,81 +57,51 @@ query {
       averageScore
       bestDay
       worstDay
+      daily { score suitability reasons }
+    }
+    days {
+      weather { date temperatureMaxC precipitationMm waveHeightMaxM }
+      scores { activity score suitability reasons }
     }
   }
 }
 ```
 
-```bash
-npm run typecheck
-npm run build
-npm start
+## What it does
+
+1. **Resolve** the place (Open-Meteo geocoding, top match).
+2. **Load weather** from SQLite if `fetched_at` is within TTL; otherwise fetch forecast + marine waves, then persist.
+3. **Score** each day 0–100 for the four activities (rule-based, with short reasons).
+4. **Rank** activities by week-average score (best first), and expose each activity’s best/worst day.
+
+```
+Query → ForecastService (cache / Open-Meteo)
+      → scoreDays → buildRankings
+      → ActivityForecast
 ```
 
-## Schema (summary)
+## Layout
 
-| Piece | Role |
-|---|---|
-| `Query.activityForecast(location)` | Only entry point |
-| `DayForecast` | One day: weather + 4 activity scores |
-| `ActivityWeekSummary` | Week roll-up + rank among activities |
-| `ActivityForecast` | Location, cache metadata, days, rankings |
-
-Full SDL: [`src/schema.graphql`](src/schema.graphql)
-
-## Open-Meteo client
-
-[`src/open-meteo/`](src/open-meteo/) — not wired to GraphQL yet.
-
-```ts
-import { openMeteo } from "./open-meteo/index.js";
-
-const forecast = await openMeteo.getForecastForLocation("Biarritz");
-// forecast.marineAvailable === true → days[].waveHeightMaxM set
-// inland cities → marineAvailable false, waveHeightMaxM null
+```
+src/
+  schema.graphql     GraphQL contract
+  index.ts           Apollo server
+  resolvers.ts       activityForecast
+  open-meteo/        Geocode + forecast + marine client
+  db/                SQLite locations + daily forecasts
+  forecast/          TTL cache orchestration
+  scoring/           Rules, per-day scores, week rankings
 ```
 
-## SQLite store
+Working decision log: [`NOTES.md`](NOTES.md)  
+Main trade-offs: [`TRADEOFFS.md`](TRADEOFFS.md)
 
-[`src/db/`](src/db/) — locations + daily forecasts with `fetched_at`. Not wired to the GraphQL path yet.
+## Assumptions
 
-```ts
-import { openForecastStore } from "./db/index.js";
-
-const store = openForecastStore(); // data/weather.db
-const saved = store.saveLocationForecast(location, days);
-const cached = store.getFreshForecast(saved.location.id, 6 * 60 * 60 * 1000);
-```
-
-## Cache-aware service
-
-[`src/forecast/`](src/forecast/) — uses SQLite when `fetched_at` is within TTL; otherwise refreshes from Open-Meteo.
-
-```ts
-import { createForecastService } from "./forecast/index.js";
-
-const service = createForecastService();
-const first = await service.getForecast("Paris");  // fromCache: false
-const second = await service.getForecast("Paris"); // fromCache: true (within 6h)
-```
-
-## Activity scoring
-
-[`src/scoring/`](src/scoring/) — rule-based 0–100 scores + short reasons per activity/day.
-
-```ts
-import { scoreDay, scoreDays } from "./scoring/index.js";
-
-const scores = scoreDay(day); // skiing, surfing, outdoor, indoor
-const week = scoreDays(forecast.days);
-```
-
-## Assumptions (so far)
-
-See [`NOTES.md`](NOTES.md) for the running decision log. Short version:
-
-1. **Location** — free-text city/town; resolve via Open-Meteo Geocoding; take the top match (no disambiguation UI — this is backend-only).
-2. **Rank** — score each day 0–100 per activity; rank activities by average score over the week.
-3. **Persistence** — SQLite cache with 6h TTL. Query→location map so cache hits skip geocoding too. Stale data refreshes weather/marine using stored coords.
-4. **Marine data** — surfing may need Open-Meteo marine API; inland locations get a low surfing score with an explicit reason when waves are unavailable.
-5. **No frontend** — GraphQL only, as specified.
+1. **One location string → one place** — first Open-Meteo geocoding hit. No disambiguation UI (backend exercise).
+2. **“Rank the next 7 days”** — score each day per activity (0–100), then rank activities by average score; also return per-day scores and best/worst dates.
+3. **Cache** — SQLite by rounded lat/lon + date; 6h TTL; query→location map so cache hits skip geocoding too. `fromCache` / `refreshedAt` are on the response.
+4. **Surfing inland** — still returned; null wave data → low score and an explicit reason. No invented swell.
+5. **Indoor sightseeing** — “bad weather alternative”: scores up when outdoors are poor, down when the day is clearly great outside. Not a museum catalogue.
+6. **Scoring is heuristic** — readable rules in `src/scoring/rules.ts`, not ML. Tunable, not authoritative.
+7. **Metric units** — °C, mm, km/h, metres (Open-Meteo defaults).
