@@ -28,7 +28,7 @@ Unpolished decision log for the take-home. Newest at the bottom.
 
 ### Cut / deferred
 
-- Resolvers, scoring functions, SQLite schema — next.
+- Resolvers, scoring functions, cache-aware fetch orchestration — next.
 - Auth, rate limiting, multi-match location picker — out of scope unless time left.
 - Unit conversion args (°C vs °F) — stay metric to match Open-Meteo defaults.
 
@@ -60,3 +60,26 @@ So: if every height is null (or the marine call fails), set `marineAvailable: fa
 - Marine failure must not sink the weather forecast — catch and continue without waves.
 - Weather + marine fetched in parallel after geocode.
 - Native `fetch` (Node 20+); no extra HTTP lib.
+
+---
+
+## 2026-07-22 — SQLite persistence
+
+### Schema
+
+`data/weather.db` (path overridable via `DB_PATH`):
+
+- `locations` — name/country/admin1/coords/timezone. Unique on `(lat_key, lon_key)` where keys are lat/lon rounded to 2 decimals (~1 km). Absorbs tiny geocode drift without duplicate places.
+- `daily_forecasts` — one row per location+date with the weather fields we score on, plus `fetched_at` (ISO-8601). Unique `(location_id, forecast_date)`. A refresh deletes+rewrites the location's days in one transaction so all rows share the same timestamp.
+
+### API (`src/db/`)
+
+- `upsertLocation` / `saveForecast` / `saveLocationForecast`
+- `getForecast` / `getForecastByCoords`
+- `getFreshForecast(locationId, maxAgeMs)` — TTL helper; default TTL still TBD when wiring the service (~6h).
+
+`marineAvailable` is derived on read (any non-null `wave_height_max_m`), not stored as its own column — avoids a redundant flag that can drift from the data.
+
+### Deferred
+
+Still not wiring cache into GraphQL/Open-Meteo fetch path — next step after scoring or as part of the service layer.

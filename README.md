@@ -2,14 +2,14 @@
 
 Backend GraphQL service that ranks the next 7 days for **skiing**, **surfing**, **outdoor sightseeing**, and **indoor sightseeing** for a given city/town, using [Open-Meteo](https://open-meteo.com/) weather data.
 
-> Status: scaffold + schema + Open-Meteo client. Scoring, persistence, and resolvers still TODO.
+> Status: scaffold + schema + Open-Meteo client + SQLite store. Scoring, cache orchestration, and resolvers still TODO.
 
 ## Stack
 
 - Node.js 20+ / TypeScript
 - Apollo Server 5 + GraphQL SDL
 - Open-Meteo (geocoding + forecast + marine)
-- SQLite (`better-sqlite3`) planned for weather cache — not wired up yet
+- SQLite via `better-sqlite3` (`data/weather.db`, override with `DB_PATH`)
 
 ## Run
 
@@ -51,12 +51,24 @@ const forecast = await openMeteo.getForecastForLocation("Biarritz");
 // inland cities → marineAvailable false, waveHeightMaxM null
 ```
 
+## SQLite store
+
+[`src/db/`](src/db/) — locations + daily forecasts with `fetched_at`. Not wired to the GraphQL path yet.
+
+```ts
+import { openForecastStore } from "./db/index.js";
+
+const store = openForecastStore(); // data/weather.db
+const saved = store.saveLocationForecast(location, days);
+const cached = store.getFreshForecast(saved.location.id, 6 * 60 * 60 * 1000);
+```
+
 ## Assumptions (so far)
 
 See [`NOTES.md`](NOTES.md) for the running decision log. Short version:
 
 1. **Location** — free-text city/town; resolve via Open-Meteo Geocoding; take the top match (no disambiguation UI — this is backend-only).
 2. **Rank** — score each day 0–100 per activity; rank activities by average score over the week.
-3. **Persistence** — cache daily forecasts in SQLite by lat/lon + forecast date; refresh on TTL (likely ~6h) rather than every request.
+3. **Persistence** — SQLite: locations unique on rounded lat/lon (2 dp); daily rows keyed by location + date with shared `fetched_at` per refresh. TTL (~6h) via `getFreshForecast` when the service layer is wired.
 4. **Marine data** — surfing may need Open-Meteo marine API; inland locations get a low surfing score with an explicit reason when waves are unavailable.
 5. **No frontend** — GraphQL only, as specified.
