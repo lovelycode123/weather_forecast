@@ -2,7 +2,7 @@
 
 Backend GraphQL service that ranks the next 7 days for **skiing**, **surfing**, **outdoor sightseeing**, and **indoor sightseeing** for a given city/town, using [Open-Meteo](https://open-meteo.com/) weather data.
 
-> Status: scaffold + schema + Open-Meteo client + SQLite + TTL cache service. Scoring and GraphQL resolvers still TODO.
+> Status: scaffold + schema + Open-Meteo + SQLite TTL cache + activity scoring. GraphQL resolvers still TODO.
 
 ## Stack
 
@@ -74,6 +74,17 @@ import { createForecastService } from "./forecast/index.js";
 const service = createForecastService();
 const first = await service.getForecast("Paris");  // fromCache: false
 const second = await service.getForecast("Paris"); // fromCache: true (within 6h)
+```
+
+## Activity scoring
+
+[`src/scoring/`](src/scoring/) — rule-based 0–100 scores + short reasons per activity/day.
+
+```ts
+import { scoreDay, scoreDays } from "./scoring/index.js";
+
+const scores = scoreDay(day); // skiing, surfing, outdoor, indoor
+const week = scoreDays(forecast.days);
 ```
 
 ## Assumptions (so far)

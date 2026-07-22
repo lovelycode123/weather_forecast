@@ -28,7 +28,7 @@ Unpolished decision log for the take-home. Newest at the bottom.
 
 ### Cut / deferred
 
-- Resolvers + scoring on top of `ForecastService` — next.
+- GraphQL resolvers + week rankings on top of `ForecastService` + `scoreDays` — next.
 - Auth, rate limiting, multi-match location picker — out of scope unless time left.
 - Unit conversion args (°C vs °F) — stay metric to match Open-Meteo defaults.
 
@@ -104,3 +104,20 @@ Still not wiring cache into GraphQL/Open-Meteo fetch path — next step after sc
 ### Not done
 
 GraphQL resolver still stubbed; scoring next. Service is ready to plug in.
+
+---
+
+## 2026-07-22 — Rule-based activity scoring
+
+Pure functions in `src/scoring/`. Each day → four `ActivityDayScore`s (0–100, suitability band, 1–3 short reasons).
+
+| Activity | What raises score | What lowers it |
+|---|---|---|
+| Skiing | snowfall, max temp ~-12–2°C | warm (>8°C), rain-without-snow, strong wind, thunder |
+| Surfing | wave height ~0.9–2.2 m, moderate wind | **null waves** (inland) → ~8 + "no wave data…"; flat / huge seas; extreme wind |
+| Outdoor sightseeing | clear, 16–27°C, dry, calm | rain, fog, extremes, wind, thunder |
+| Indoor sightseeing | rain / thunder / harsh temps / high wind ("museum day") | clear mild dry calm outdoors (indoor less compelling) |
+
+Suitability: 0–24 POOR, 25–49 FAIR, 50–74 GOOD, 75–100 EXCELLENT.
+
+Deliberately heuristic and readable — no ML, no hidden weights file. Week-level ranking still TODO in the GraphQL/assembly step.
