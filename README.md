@@ -2,12 +2,13 @@
 
 Backend GraphQL service that ranks the next 7 days for **skiing**, **surfing**, **outdoor sightseeing**, and **indoor sightseeing** for a given city/town, using [Open-Meteo](https://open-meteo.com/) weather data.
 
-> Status: scaffold + GraphQL schema only. No scoring, persistence, or real resolvers yet.
+> Status: scaffold + schema + Open-Meteo client. Scoring, persistence, and resolvers still TODO.
 
 ## Stack
 
 - Node.js 20+ / TypeScript
 - Apollo Server 5 + GraphQL SDL
+- Open-Meteo (geocoding + forecast + marine)
 - SQLite (`better-sqlite3`) planned for weather cache — not wired up yet
 
 ## Run
@@ -37,6 +38,18 @@ npm start
 | `ActivityForecast` | Location, cache metadata, days, rankings |
 
 Full SDL: [`src/schema.graphql`](src/schema.graphql)
+
+## Open-Meteo client
+
+[`src/open-meteo/`](src/open-meteo/) — not wired to GraphQL yet.
+
+```ts
+import { openMeteo } from "./open-meteo/index.js";
+
+const forecast = await openMeteo.getForecastForLocation("Biarritz");
+// forecast.marineAvailable === true → days[].waveHeightMaxM set
+// inland cities → marineAvailable false, waveHeightMaxM null
+```
 
 ## Assumptions (so far)
 

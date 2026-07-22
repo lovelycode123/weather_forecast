@@ -28,10 +28,35 @@ Unpolished decision log for the take-home. Newest at the bottom.
 
 ### Cut / deferred
 
-- Resolvers, Open-Meteo client, scoring functions, SQLite schema — next.
+- Resolvers, scoring functions, SQLite schema — next.
 - Auth, rate limiting, multi-match location picker — out of scope unless time left.
 - Unit conversion args (°C vs °F) — stay metric to match Open-Meteo defaults.
 
 ### Stack pick
 
 Apollo Server 5 + SDL file over code-first: schema is the contract reviewers will read first, and the brief asks for GraphQL clearly. `tsx` for dev so we don't fight a build step while iterating. (Started on AS4, bumped to 5 after install flagged AS4 as EOL.)
+
+---
+
+## 2026-07-22 — Open-Meteo client
+
+### What I built
+
+`src/open-meteo/` — geocode → 7-day daily forecast → optional marine wave merge.
+
+- Geocoding: `geocoding-api.open-meteo.com/v1/search`, `count=1` (first hit).
+- Weather: `api.open-meteo.com/v1/forecast` daily vars matching schema fields.
+- Waves: `marine-api.open-meteo.com/v1/marine` `wave_height_max`.
+
+### Inland / no waves
+
+Probed Paris and Kansas City: marine API returns **HTTP 200 with all-null** `wave_height_max`, not an error. Coastal (Hossegor-ish) returns real metres.
+
+So: if every height is null (or the marine call fails), set `marineAvailable: false` and leave `waveHeightMaxM: null` on each day. Don't invent swell. Scoring can later use `marineAvailable` / null waves for surfing reasons.
+
+### Other calls
+
+- Empty geocode → `LocationNotFoundError` (no `results` key).
+- Marine failure must not sink the weather forecast — catch and continue without waves.
+- Weather + marine fetched in parallel after geocode.
+- Native `fetch` (Node 20+); no extra HTTP lib.
