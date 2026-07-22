@@ -1,0 +1,96 @@
+"""Suitability for an outdoor/indoor activity on a given day."""
+enum Activity {
+  SKIING
+  SURFING
+  OUTDOOR_SIGHTSEEING
+  INDOOR_SIGHTSEEING
+}
+
+"""Coarse label derived from the numeric score (for UI / quick reading)."""
+enum Suitability {
+  POOR
+  FAIR
+  GOOD
+  EXCELLENT
+}
+
+"""A place resolved from the caller's city/town string."""
+type Location {
+  name: String!
+  country: String
+  admin1: String
+  latitude: Float!
+  longitude: Float!
+  timezone: String!
+}
+
+"""
+Daily weather inputs used for scoring.
+Units match Open-Meteo defaults unless noted.
+Not every field is used by every activity — exposed so scores are auditable.
+"""
+type DailyWeather {
+  date: String!
+  weatherCode: Int!
+  temperatureMaxC: Float!
+  temperatureMinC: Float!
+  precipitationMm: Float!
+  snowfallCm: Float!
+  precipitationProbabilityMax: Int
+  windSpeedMaxKmh: Float!
+  windGustsMaxKmh: Float
+  """Mean sea-level pressure (hPa). Useful for surfing / swell context later."""
+  pressureMslHpa: Float
+  """Wave height in metres — may be null inland (marine API not applicable)."""
+  waveHeightMaxM: Float
+}
+
+"""How good one activity looks on one day."""
+type ActivityDayScore {
+  activity: Activity!
+  """0–100. Higher = better conditions for that activity."""
+  score: Float!
+  suitability: Suitability!
+  """Short human-readable drivers of the score (e.g. "heavy rain", "fresh snow")."""
+  reasons: [String!]!
+}
+
+"""One day of the 7-day window: raw weather + per-activity scores."""
+type DayForecast {
+  weather: DailyWeather!
+  scores: [ActivityDayScore!]!
+}
+
+"""
+Week-level roll-up for a single activity.
+`rank` is 1 = best average score among the four activities for this location/week.
+"""
+type ActivityWeekSummary {
+  activity: Activity!
+  rank: Int!
+  averageScore: Float!
+  bestDay: String!
+  worstDay: String!
+  daily: [ActivityDayScore!]!
+}
+
+"""Full forecast payload for a location."""
+type ActivityForecast {
+  location: Location!
+  """ISO-8601 timestamp of when this forecast data was written to storage."""
+  refreshedAt: String!
+  """True when served from cache without hitting Open-Meteo on this request."""
+  fromCache: Boolean!
+  """Exactly 7 days, starting from the local 'today' in the location's timezone."""
+  days: [DayForecast!]!
+  """Activities ordered by rank (best first)."""
+  rankings: [ActivityWeekSummary!]!
+}
+
+type Query {
+  """
+  Rank the next 7 days for skiing, surfing, outdoor sightseeing,
+  and indoor sightseeing for the given city or town.
+  """
+  activityForecast(location: String!): ActivityForecast!
+}

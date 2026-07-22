@@ -1,0 +1,27 @@
+{
+  "name": "weather-forecast",
+  "version": "0.1.0",
+  "description": "Activity weather ranking service — ranks the next 7 days for skiing, surfing, and sightseeing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc && node scripts/copy-schema.mjs",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@apollo/server": "^5.5.1",
+    "better-sqlite3": "^11.8.1",
+    "graphql": "^16.10.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
