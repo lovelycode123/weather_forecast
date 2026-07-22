@@ -84,7 +84,7 @@ Query → ForecastService (cache / Open-Meteo)
 
 ```
 src/
-  schema.graphql     GraphQL contract
+  typedef.graphql    GraphQL contract (typeDefs)
   index.ts           Apollo server
   resolvers.ts       activityForecast
   open-meteo/        Geocode + forecast + marine client

@@ -10,13 +10,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function loadTypeDefs(): string {
   const candidates = [
-    join(__dirname, "schema.graphql"),
-    join(process.cwd(), "src", "schema.graphql"),
+    join(__dirname, "typedef.graphql"),
+    join(process.cwd(), "src", "typedef.graphql"),
   ];
   for (const path of candidates) {
     if (existsSync(path)) return readFileSync(path, "utf8");
   }
-  throw new Error("Could not find schema.graphql");
+  throw new Error("Could not find typedef.graphql");
 }
 
 const forecastService = createForecastService();

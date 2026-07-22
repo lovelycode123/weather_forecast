@@ -42,7 +42,7 @@ Also cache **geocode results** (query → location). Otherwise every “cache hi
 
 ## SDL schema file vs code-first
 
-**Chose SDL** (`schema.graphql`) + Apollo.
+**Chose SDL** (`typedef.graphql`) + Apollo.
 
 **Trade-off:** slightly more wiring than code-first types. The schema is the contract reviewers read first; keeping it as a file makes that intentional.
 

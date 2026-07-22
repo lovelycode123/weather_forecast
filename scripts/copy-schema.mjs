@@ -6,5 +6,5 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const destDir = join(root, "dist");
 
 mkdirSync(destDir, { recursive: true });
-copyFileSync(join(root, "src", "schema.graphql"), join(destDir, "schema.graphql"));
-console.log("Copied schema.graphql → dist/");
+copyFileSync(join(root, "src", "typedef.graphql"), join(destDir, "typedef.graphql"));
+console.log("Copied typedef.graphql → dist/");
